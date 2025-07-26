@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Icon from '@/components/ui/icon';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,12 +6,26 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Textarea } from '@/components/ui/textarea';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('chats');
   const [searchQuery, setSearchQuery] = useState('');
   const [isRegistered, setIsRegistered] = useState(false);
   const [username, setUsername] = useState('');
+  const [selectedChat, setSelectedChat] = useState(null);
+  const [messages, setMessages] = useState({});
+  const [newMessage, setNewMessage] = useState('');
+  const messagesEndRef = useRef(null);
+  
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+  
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   // Мок-данные для демонстрации
   const chats = [
@@ -70,10 +84,61 @@ const Index = () => {
     </div>
   );
 
+  const sendMessage = (chatId) => {
+    if (!newMessage.trim()) return;
+    
+    const messageId = Date.now();
+    const message = {
+      id: messageId,
+      text: newMessage,
+      sender: 'me',
+      time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+      timestamp: Date.now()
+    };
+    
+    setMessages(prev => ({
+      ...prev,
+      [chatId]: [...(prev[chatId] || []), message]
+    }));
+    
+    setNewMessage('');
+    
+    // Симуляция ответа собеседника
+    setTimeout(() => {
+      const responses = [
+        'Привет! 👋',
+        'Как дела? ❄️',
+        'Отличная погода сегодня!',
+        'Согласен полностью',
+        'Интересно!',
+        'Спасибо за сообщение!',
+        'До встречи! 🌨️'
+      ];
+      
+      const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+      const responseMessage = {
+        id: Date.now() + 1,
+        text: randomResponse,
+        sender: 'other',
+        time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+        timestamp: Date.now()
+      };
+      
+      setMessages(prev => ({
+        ...prev,
+        [chatId]: [...(prev[chatId] || []), responseMessage]
+      }));
+    }, 1000 + Math.random() * 2000);
+  };
+
   const ChatsList = () => (
     <div className="space-y-2">
       {chats.map((chat) => (
-        <Card key={chat.id} className="p-4 hover:bg-slate-50 transition-all duration-200 cursor-pointer hover:shadow-md border-slate-100 hover-scale">
+        <Card 
+          key={chat.id} 
+          className="p-4 hover:bg-slate-50 transition-all duration-200 cursor-pointer hover:shadow-md border-slate-100 hover-scale"
+          onClick={() => setSelectedChat(chat)}
+        >
           <div className="flex items-center space-x-3">
             <div className="relative">
               <Avatar className="w-12 h-12">
@@ -102,6 +167,123 @@ const Index = () => {
       ))}
     </div>
   );
+
+  const ChatWindow = ({ chat }) => {
+    const chatMessages = messages[chat.id] || [];
+    
+    return (
+      <div className="flex flex-col h-full bg-white rounded-lg shadow-lg animate-fade-in">
+        {/* Chat Header */}
+        <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-slate-50">
+          <div className="flex items-center space-x-3">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setSelectedChat(null)}
+              className="md:hidden"
+            >
+              <Icon name="ArrowLeft" size={18} />
+            </Button>
+            <div className="relative">
+              <Avatar className="w-10 h-10">
+                <AvatarFallback className="bg-gradient-to-br from-blue-400 to-slate-500 text-white text-sm">
+                  {chat.name.split(' ').map(n => n[0]).join('')}
+                </AvatarFallback>
+              </Avatar>
+              {chat.online && (
+                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+              )}
+            </div>
+            <div>
+              <h3 className="font-medium text-slate-800">{chat.name}</h3>
+              <p className="text-xs text-slate-500">{chat.online ? 'В сети' : 'Был недавно'}</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button variant="ghost" size="sm">
+              <Icon name="Phone" size={18} />
+            </Button>
+            <Button variant="ghost" size="sm">
+              <Icon name="Video" size={18} />
+            </Button>
+            <Button variant="ghost" size="sm">
+              <Icon name="MoreVertical" size={18} />
+            </Button>
+          </div>
+        </div>
+        
+        {/* Messages Area */}
+        <ScrollArea className="flex-1 p-4">
+          <div className="space-y-4">
+            {chatMessages.length === 0 ? (
+              <div className="text-center text-slate-500 py-8">
+                <Icon name="MessageCircle" size={48} className="mx-auto mb-2 text-slate-300" />
+                <p>Начните общение с {chat.name}</p>
+                <p className="text-sm">Напишите первое сообщение ❄️</p>
+              </div>
+            ) : (
+              chatMessages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`flex ${message.sender === 'me' ? 'justify-end' : 'justify-start'} animate-fade-in`}
+                >
+                  <div
+                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
+                      message.sender === 'me'
+                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
+                        : 'bg-slate-100 text-slate-800'
+                    }`}
+                  >
+                    <p className="text-sm">{message.text}</p>
+                    <p
+                      className={`text-xs mt-1 ${
+                        message.sender === 'me' ? 'text-blue-100' : 'text-slate-500'
+                      }`}
+                    >
+                      {message.time}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+        </ScrollArea>
+        
+        {/* Message Input */}
+        <div className="p-4 border-t border-slate-200 bg-slate-50">
+          <div className="flex items-end space-x-2">
+            <Button variant="ghost" size="sm" className="mb-2">
+              <Icon name="Paperclip" size={18} />
+            </Button>
+            <div className="flex-1">
+              <Textarea
+                placeholder="Написать сообщение..."
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage(chat.id);
+                  }
+                }}
+                className="min-h-[40px] max-h-32 resize-none border-slate-200 focus:border-blue-400 transition-colors"
+                rows={1}
+              />
+            </div>
+            <Button 
+              onClick={() => sendMessage(chat.id)}
+              disabled={!newMessage.trim()}
+              className="bg-blue-500 hover:bg-blue-600 mb-2"
+              size="sm"
+            >
+              <Icon name="Send" size={18} />
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const ContactsList = () => (
     <div className="space-y-2">
@@ -244,14 +426,22 @@ const Index = () => {
         <div className="px-4 pb-20">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsContent value="chats" className="space-y-4 animate-fade-in">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-slate-800">Чаты</h2>
-                <Button size="sm" className="bg-blue-500 hover:bg-blue-600">
-                  <Icon name="Plus" size={16} className="mr-1" />
-                  Новый чат
-                </Button>
-              </div>
-              <ChatsList />
+              {selectedChat ? (
+                <div className="h-[calc(100vh-200px)]">
+                  <ChatWindow chat={selectedChat} />
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-slate-800">Чаты</h2>
+                    <Button size="sm" className="bg-blue-500 hover:bg-blue-600">
+                      <Icon name="Plus" size={16} className="mr-1" />
+                      Новый чат
+                    </Button>
+                  </div>
+                  <ChatsList />
+                </>
+              )}
             </TabsContent>
 
             <TabsContent value="contacts" className="space-y-4 animate-fade-in">
